@@ -32,6 +32,7 @@ import io.agentscope.core.model.ChatUsage;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -97,6 +98,16 @@ public class DashScopeResponseParser {
             ChatUsage usage = null;
             DashScopeUsage u = response.getUsage();
             if (u != null) {
+                Map<String, Object> details = new HashMap<>();
+                if (u.getInputTokensDetails() != null) {
+                    details.put("inputTokensDetails", u.getInputTokensDetails());
+                }
+                if (u.getOutputTokensDetails() != null) {
+                    details.put("outputTokensDetails", u.getOutputTokensDetails());
+                }
+                if (u.getPromptTokensDetails() != null) {
+                    details.put("promptTokensDetails", u.getPromptTokensDetails());
+                }
                 usage =
                         ChatUsage.builder()
                                 .inputTokens(u.getInputTokens() != null ? u.getInputTokens() : 0)
@@ -104,6 +115,7 @@ public class DashScopeResponseParser {
                                 .time(
                                         Duration.between(startTime, Instant.now()).toMillis()
                                                 / 1000.0)
+                                .details(details)
                                 .build();
             }
 

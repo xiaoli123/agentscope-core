@@ -34,7 +34,9 @@ import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.model.ChatResponse;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -189,6 +191,81 @@ class DashScopeResponseParserTest {
         assertNotNull(chatResponse.getUsage());
         assertEquals(10, chatResponse.getUsage().getInputTokens());
         assertEquals(5, chatResponse.getUsage().getOutputTokens());
+    }
+
+    @Test
+    void testParseResponseWithCacheDetails() {
+        DashScopeMessage message =
+                DashScopeMessage.builder().role("assistant").content("Hello!").build();
+
+        DashScopeChoice choice = new DashScopeChoice();
+        choice.setMessage(message);
+        choice.setFinishReason("stop");
+
+        DashScopeOutput output = new DashScopeOutput();
+        output.setChoices(List.of(choice));
+
+        DashScopeUsage usage = new DashScopeUsage();
+        usage.setInputTokens(100);
+        usage.setOutputTokens(20);
+
+        Map<String, Object> promptTokensDetails = new HashMap<>();
+        promptTokensDetails.put("cached_tokens", 80);
+        Map<String, Object> cacheCreation = new HashMap<>();
+        cacheCreation.put("cache_creation_input_tokens", 50);
+        cacheCreation.put("cache_type", "ephemeral");
+        promptTokensDetails.put("cache_creation", cacheCreation);
+        usage.setPromptTokensDetails(promptTokensDetails);
+
+        Map<String, Object> outputTokensDetails = new HashMap<>();
+        outputTokensDetails.put("text_tokens", 15);
+        outputTokensDetails.put("reasoning_tokens", 5);
+        usage.setOutputTokensDetails(outputTokensDetails);
+
+        Map<String, Object> inputTokensDetails = new HashMap<>();
+        inputTokensDetails.put("image_tokens", 10);
+        inputTokensDetails.put("audio_tokens", 5);
+        usage.setInputTokensDetails(inputTokensDetails);
+
+        DashScopeResponse response = new DashScopeResponse();
+        response.setRequestId("req-cache");
+        response.setOutput(output);
+        response.setUsage(usage);
+
+        ChatResponse chatResponse = parser.parseResponse(response, startTime);
+
+        assertNotNull(chatResponse);
+        assertNotNull(chatResponse.getUsage());
+        assertEquals(100, chatResponse.getUsage().getInputTokens());
+        assertEquals(20, chatResponse.getUsage().getOutputTokens());
+
+        Map<String, Object> details = chatResponse.getUsage().getDetails();
+        assertNotNull(details);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> promptDetails =
+                (Map<String, Object>) details.get("promptTokensDetails");
+        assertNotNull(promptDetails);
+        assertEquals(80, promptDetails.get("cached_tokens"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> cacheCreationMap =
+                (Map<String, Object>) promptDetails.get("cache_creation");
+        assertNotNull(cacheCreationMap);
+        assertEquals(50, cacheCreationMap.get("cache_creation_input_tokens"));
+        assertEquals("ephemeral", cacheCreationMap.get("cache_type"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> outputDetails =
+                (Map<String, Object>) details.get("outputTokensDetails");
+        assertNotNull(outputDetails);
+        assertEquals(15, outputDetails.get("text_tokens"));
+        assertEquals(5, outputDetails.get("reasoning_tokens"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> inputDetails = (Map<String, Object>) details.get("inputTokensDetails");
+        assertNotNull(inputDetails);
+        assertEquals(10, inputDetails.get("image_tokens"));
+        assertEquals(5, inputDetails.get("audio_tokens"));
     }
 
     @Test

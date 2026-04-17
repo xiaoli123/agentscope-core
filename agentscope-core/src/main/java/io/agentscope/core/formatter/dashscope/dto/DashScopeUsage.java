@@ -17,6 +17,7 @@ package io.agentscope.core.formatter.dashscope.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Map;
 
 /**
  * DashScope usage statistics DTO.
@@ -58,6 +59,18 @@ public class DashScopeUsage {
     /** Audio tokens (for multimodal). */
     @JsonProperty("audio_tokens")
     private Integer audioTokens;
+
+    /** Input tokens details (for multimodal and cache info). */
+    @JsonProperty("input_tokens_details")
+    private Map<String, Object> inputTokensDetails;
+
+    /** Output tokens details (for text/reasoning breakdown). */
+    @JsonProperty("output_tokens_details")
+    private Map<String, Object> outputTokensDetails;
+
+    /** Prompt tokens details (for cache info). */
+    @JsonProperty("prompt_tokens_details")
+    private Map<String, Object> promptTokensDetails;
 
     public DashScopeUsage() {}
 
@@ -107,5 +120,29 @@ public class DashScopeUsage {
 
     public void setAudioTokens(Integer audioTokens) {
         this.audioTokens = audioTokens;
+    }
+
+    public Map<String, Object> getInputTokensDetails() {
+        return inputTokensDetails;
+    }
+
+    public void setInputTokensDetails(Map<String, Object> inputTokensDetails) {
+        this.inputTokensDetails = inputTokensDetails;
+    }
+
+    public Map<String, Object> getOutputTokensDetails() {
+        return outputTokensDetails;
+    }
+
+    public void setOutputTokensDetails(Map<String, Object> outputTokensDetails) {
+        this.outputTokensDetails = outputTokensDetails;
+    }
+
+    public Map<String, Object> getPromptTokensDetails() {
+        return promptTokensDetails;
+    }
+
+    public void setPromptTokensDetails(Map<String, Object> promptTokensDetails) {
+        this.promptTokensDetails = promptTokensDetails;
     }
 }
