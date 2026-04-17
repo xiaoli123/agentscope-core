@@ -16,6 +16,7 @@
 package io.agentscope.core.formatter.dashscope;
 
 import io.agentscope.core.formatter.AbstractBaseFormatter;
+import io.agentscope.core.formatter.dashscope.dto.DashScopeContentPart;
 import io.agentscope.core.formatter.dashscope.dto.DashScopeInput;
 import io.agentscope.core.formatter.dashscope.dto.DashScopeMessage;
 import io.agentscope.core.formatter.dashscope.dto.DashScopeParameters;
@@ -175,9 +176,9 @@ public class DashScopeChatFormatter
     /**
      * Apply cache control to DashScope messages.
      *
-     * <p>Adds <code>cache_control: {"type": "ephemeral"}</code> to all system messages and the last
-     * message in the list. Messages that already have cache_control set (e.g., via manual metadata
-     * marking) will not be overwritten.
+     * <p>Adds <code>cache_control: {"type": "ephemeral"}</code> to the content part of all system
+     * messages and the last message in the list. Messages whose content already has cache_control
+     * set (e.g., via manual metadata marking) will not be overwritten.
      *
      * @param messages the list of formatted DashScope messages
      */
@@ -186,13 +187,63 @@ public class DashScopeChatFormatter
             return;
         }
         for (DashScopeMessage msg : messages) {
-            if ("system".equals(msg.getRole()) && msg.getCacheControl() == null) {
-                msg.setCacheControl(EPHEMERAL_CACHE_CONTROL);
+            if ("system".equals(msg.getRole()) && !hasCacheControlInContent(msg)) {
+                applyCacheControlToMessageContent(msg);
             }
         }
         DashScopeMessage lastMsg = messages.get(messages.size() - 1);
-        if (lastMsg.getCacheControl() == null) {
-            lastMsg.setCacheControl(EPHEMERAL_CACHE_CONTROL);
+        if (!hasCacheControlInContent(lastMsg)) {
+            applyCacheControlToMessageContent(lastMsg);
+        }
+    }
+
+    /**
+     * Check whether any content part of the message already has cache_control set.
+     *
+     * @param msg the DashScope message to check
+     * @return true if at least one content part has cache_control
+     */
+    static boolean hasCacheControlInContent(DashScopeMessage msg) {
+        if (msg == null) {
+            return false;
+        }
+        if (msg.getContent() instanceof List<?> rawList) {
+            for (Object o : rawList) {
+                if (o
+                                instanceof
+                                io.agentscope.core.formatter.dashscope.dto.DashScopeContentPart part
+                        && part.getCacheControl() != null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static void applyCacheControlToMessageContent(DashScopeMessage msg) {
+        if (msg == null) {
+            return;
+        }
+        Object content = msg.getContent();
+        if (content instanceof String text) {
+            DashScopeContentPart part = DashScopeContentPart.text(text);
+            part.setCacheControl(EPHEMERAL_CACHE_CONTROL);
+            msg.setContent(List.of(part));
+        } else if (content instanceof List<?> rawList) {
+            @SuppressWarnings("unchecked")
+            List<io.agentscope.core.formatter.dashscope.dto.DashScopeContentPart> parts =
+                    (List<io.agentscope.core.formatter.dashscope.dto.DashScopeContentPart>) rawList;
+            if (parts.isEmpty()) {
+                return;
+            }
+            // Place cache_control on the last text part, matching DashScope protocol examples
+            for (int i = parts.size() - 1; i >= 0; i--) {
+                io.agentscope.core.formatter.dashscope.dto.DashScopeContentPart part = parts.get(i);
+                if (part.getText() != null && !part.getText().isEmpty()) {
+                    part.setCacheControl(EPHEMERAL_CACHE_CONTROL);
+                    break;
+                }
+            }
         }
     }
 

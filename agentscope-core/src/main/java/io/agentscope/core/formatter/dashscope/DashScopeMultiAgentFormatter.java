@@ -368,9 +368,9 @@ public class DashScopeMultiAgentFormatter
     /**
      * Apply cache control to DashScope messages.
      *
-     * <p>Adds <code>cache_control: {"type": "ephemeral"}</code> to all system messages and the last
-     * message in the list. Messages that already have cache_control set (e.g., via manual metadata
-     * marking) will not be overwritten.
+     * <p>Adds <code>cache_control: {"type": "ephemeral"}</code> to the content part of all system
+     * messages and the last message in the list. Messages whose content already has cache_control
+     * set (e.g., via manual metadata marking) will not be overwritten.
      *
      * @param messages the list of formatted DashScope messages
      */
@@ -380,13 +380,40 @@ public class DashScopeMultiAgentFormatter
         }
         Map<String, String> ephemeral = DashScopeChatFormatter.getEphemeralCacheControl();
         for (DashScopeMessage msg : messages) {
-            if ("system".equals(msg.getRole()) && msg.getCacheControl() == null) {
-                msg.setCacheControl(ephemeral);
+            if ("system".equals(msg.getRole())
+                    && !DashScopeChatFormatter.hasCacheControlInContent(msg)) {
+                applyCacheControlToMessageContent(msg, ephemeral);
             }
         }
         DashScopeMessage lastMsg = messages.get(messages.size() - 1);
-        if (lastMsg.getCacheControl() == null) {
-            lastMsg.setCacheControl(ephemeral);
+        if (!DashScopeChatFormatter.hasCacheControlInContent(lastMsg)) {
+            applyCacheControlToMessageContent(lastMsg, ephemeral);
+        }
+    }
+
+    private static void applyCacheControlToMessageContent(
+            DashScopeMessage msg, Map<String, String> cacheControl) {
+        if (msg == null) {
+            return;
+        }
+        Object content = msg.getContent();
+        if (content instanceof String text) {
+            DashScopeContentPart part = DashScopeContentPart.text(text);
+            part.setCacheControl(cacheControl);
+            msg.setContent(List.of(part));
+        } else if (content instanceof List<?> rawList) {
+            @SuppressWarnings("unchecked")
+            List<DashScopeContentPart> parts = (List<DashScopeContentPart>) rawList;
+            if (parts.isEmpty()) {
+                return;
+            }
+            for (int i = parts.size() - 1; i >= 0; i--) {
+                DashScopeContentPart part = parts.get(i);
+                if (part.getText() != null && !part.getText().isEmpty()) {
+                    part.setCacheControl(cacheControl);
+                    break;
+                }
+            }
         }
     }
 }

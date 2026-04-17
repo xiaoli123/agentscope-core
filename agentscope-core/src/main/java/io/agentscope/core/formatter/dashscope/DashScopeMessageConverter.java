@@ -246,7 +246,7 @@ public class DashScopeMessageConverter {
     }
 
     /**
-     * Apply cache_control from Msg metadata to the converted DashScopeMessage.
+     * Apply cache_control from Msg metadata to the converted DashScopeMessage content part.
      *
      * @param msg the source message with metadata
      * @param result the converted DashScope message
@@ -256,8 +256,26 @@ public class DashScopeMessageConverter {
             return;
         }
         Object cacheFlag = msg.getMetadata().get(MessageMetadataKeys.CACHE_CONTROL);
-        if (Boolean.TRUE.equals(cacheFlag)) {
-            result.setCacheControl(DashScopeChatFormatter.getEphemeralCacheControl());
+        if (!Boolean.TRUE.equals(cacheFlag)) {
+            return;
+        }
+        Object content = result.getContent();
+        if (content instanceof String text) {
+            DashScopeContentPart part = DashScopeContentPart.text(text);
+            part.setCacheControl(DashScopeChatFormatter.getEphemeralCacheControl());
+            result.setContent(List.of(part));
+        } else if (content instanceof List<?> rawList) {
+            @SuppressWarnings("unchecked")
+            List<DashScopeContentPart> parts = (List<DashScopeContentPart>) rawList;
+            if (!parts.isEmpty()) {
+                for (int i = parts.size() - 1; i >= 0; i--) {
+                    DashScopeContentPart part = parts.get(i);
+                    if (part.getText() != null && !part.getText().isEmpty()) {
+                        part.setCacheControl(DashScopeChatFormatter.getEphemeralCacheControl());
+                        break;
+                    }
+                }
+            }
         }
     }
 }
