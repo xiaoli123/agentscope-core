@@ -56,6 +56,7 @@ public class ReasoningContext {
     private int inputTokens = 0;
     private int outputTokens = 0;
     private double time = 0;
+    private Map<String, Object> details;
 
     public ReasoningContext(String agentName) {
         this.agentName = agentName;
@@ -84,6 +85,12 @@ public class ReasoningContext {
             inputTokens = usage.getInputTokens();
             outputTokens = usage.getOutputTokens();
             time = usage.getTime();
+            if (usage.getDetails() != null && !usage.getDetails().isEmpty()) {
+                if (details == null) {
+                    details = new HashMap<>();
+                }
+                details.putAll(usage.getDetails());
+            }
         }
 
         List<Msg> streamingMsgs = new ArrayList<>();
@@ -172,6 +179,7 @@ public class ReasoningContext {
                             .inputTokens(inputTokens)
                             .outputTokens(outputTokens)
                             .time(time)
+                            .details(details)
                             .build();
             metadata.put(MessageMetadataKeys.CHAT_USAGE, chatUsage);
         }
@@ -283,6 +291,7 @@ public class ReasoningContext {
                     .inputTokens(inputTokens)
                     .outputTokens(outputTokens)
                     .time(time)
+                    .details(details)
                     .build();
         }
         return null;

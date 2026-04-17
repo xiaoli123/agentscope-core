@@ -15,6 +15,10 @@
  */
 package io.agentscope.core.model;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Represents token usage information for chat completion responses.
  *
@@ -26,6 +30,7 @@ public class ChatUsage {
     private final int inputTokens;
     private final int outputTokens;
     private final double time;
+    private final Map<String, Object> details;
 
     /**
      * Creates a new ChatUsage instance.
@@ -35,9 +40,25 @@ public class ChatUsage {
      * @param time the execution time in seconds
      */
     public ChatUsage(int inputTokens, int outputTokens, double time) {
+        this(inputTokens, outputTokens, time, Collections.emptyMap());
+    }
+
+    /**
+     * Creates a new ChatUsage instance with usage details.
+     *
+     * @param inputTokens the number of tokens used for the input/prompt
+     * @param outputTokens the number of tokens used for the output/generated response
+     * @param time the execution time in seconds
+     * @param details provider-specific usage details
+     */
+    public ChatUsage(int inputTokens, int outputTokens, double time, Map<String, Object> details) {
         this.inputTokens = inputTokens;
         this.outputTokens = outputTokens;
         this.time = time;
+        this.details =
+                details != null
+                        ? Collections.unmodifiableMap(new HashMap<>(details))
+                        : Collections.emptyMap();
     }
 
     /**
@@ -77,6 +98,18 @@ public class ChatUsage {
     }
 
     /**
+     * Gets provider-specific usage details.
+     *
+     * <p>This map may contain model-provider specific usage information such as
+     * cache tokens, image tokens, video tokens, etc.
+     *
+     * @return an unmodifiable map of usage details, empty if none
+     */
+    public Map<String, Object> getDetails() {
+        return details;
+    }
+
+    /**
      * Creates a new builder for ChatUsage.
      *
      * @return a new Builder instance
@@ -92,6 +125,7 @@ public class ChatUsage {
         private int inputTokens;
         private int outputTokens;
         private double time;
+        private Map<String, Object> details;
 
         /**
          * Sets the number of input tokens.
@@ -127,12 +161,38 @@ public class ChatUsage {
         }
 
         /**
+         * Adds a provider-specific usage detail.
+         *
+         * @param key the detail key
+         * @param value the detail value
+         * @return this builder instance
+         */
+        public Builder detail(String key, Object value) {
+            if (this.details == null) {
+                this.details = new HashMap<>();
+            }
+            this.details.put(key, value);
+            return this;
+        }
+
+        /**
+         * Sets provider-specific usage details.
+         *
+         * @param details the details map
+         * @return this builder instance
+         */
+        public Builder details(Map<String, Object> details) {
+            this.details = details != null ? new HashMap<>(details) : null;
+            return this;
+        }
+
+        /**
          * Builds a new ChatUsage instance with the set values.
          *
          * @return a new ChatUsage instance
          */
         public ChatUsage build() {
-            return new ChatUsage(inputTokens, outputTokens, time);
+            return new ChatUsage(inputTokens, outputTokens, time, details);
         }
     }
 }
