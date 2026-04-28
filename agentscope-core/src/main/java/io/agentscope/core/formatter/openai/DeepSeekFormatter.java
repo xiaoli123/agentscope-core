@@ -30,6 +30,7 @@ import java.util.List;
  *   <li>System messages should be converted to user messages</li>
  *   <li>Does NOT support strict parameter in tool definitions</li>
  *   <li>reasoning_content must be kept within current turn but removed for previous turns</li>
+ *   <li>reasoning_content must be preserved for assistant messages with tool_calls in previous turns</li>
  * </ul>
  *
  * <p>Usage:
@@ -86,7 +87,8 @@ public class DeepSeekFormatter extends OpenAIChatFormatter {
      *   <li>No name field in messages</li>
      *   <li>System messages converted to user</li>
      *   <li>reasoning_content kept within current turn (after last user message)</li>
-     *   <li>reasoning_content removed for previous turns (before last user message)</li>
+     *   <li>reasoning_content removed for previous turns (before last user message), except for
+     *       assistant messages that contain tool_calls</li>
      * </ul>
      *
      * <p>This method is static to allow sharing with {@link DeepSeekMultiAgentFormatter}.
@@ -137,8 +139,10 @@ public class DeepSeekFormatter extends OpenAIChatFormatter {
         boolean isSystem = "system".equals(msg.getRole());
         boolean hasName = msg.getName() != null;
         boolean hasReasoning = msg.getReasoningContent() != null;
-        // Remove reasoning_content for previous turns, keep for current turn
-        boolean shouldRemoveReasoning = hasReasoning && !isCurrentTurn;
+        boolean hasToolCalls = msg.getToolCalls() != null && !msg.getToolCalls().isEmpty();
+        // Remove reasoning_content for previous turns, but keep for assistant messages with
+        // tool_calls
+        boolean shouldRemoveReasoning = hasReasoning && !isCurrentTurn && !hasToolCalls;
 
         if (!isSystem && !hasName && !shouldRemoveReasoning) {
             return msg;
@@ -162,8 +166,8 @@ public class DeepSeekFormatter extends OpenAIChatFormatter {
             builder.toolCallId(msg.getToolCallId());
         }
 
-        // Keep reasoning_content only for current turn
-        if (hasReasoning && isCurrentTurn) {
+        // Keep reasoning_content for current turn, or for previous turns with tool_calls
+        if (hasReasoning && (isCurrentTurn || hasToolCalls)) {
             builder.reasoningContent(msg.getReasoningContent());
         }
 

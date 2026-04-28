@@ -21,8 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.agentscope.core.formatter.openai.dto.OpenAIFunction;
 import io.agentscope.core.formatter.openai.dto.OpenAIMessage;
 import io.agentscope.core.formatter.openai.dto.OpenAIRequest;
+import io.agentscope.core.formatter.openai.dto.OpenAIToolCall;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
@@ -364,6 +366,90 @@ class DeepSeekMultiAgentFormatterTest {
             // Tool messages should be present
             boolean hasToolMessage = result.stream().anyMatch(m -> "tool".equals(m.getRole()));
             assertTrue(hasToolMessage);
+        }
+
+        @Test
+        @DisplayName(
+                "Should keep reasoning_content for assistant with tool_calls in previous turns")
+        void testKeepReasoningContentForToolCallsInPreviousTurns() {
+            List<Msg> messages = new ArrayList<>();
+            messages.add(
+                    Msg.builder()
+                            .role(MsgRole.USER)
+                            .name("User")
+                            .content(List.of(TextBlock.builder().text("查询发票").build()))
+                            .build());
+            messages.add(
+                    Msg.builder()
+                            .role(MsgRole.ASSISTANT)
+                            .content(
+                                    List.of(
+                                            ToolUseBlock.builder()
+                                                    .id("call_123")
+                                                    .name("query_invoice")
+                                                    .input(Map.of())
+                                                    .build()))
+                            .build());
+            messages.add(
+                    Msg.builder()
+                            .role(MsgRole.TOOL)
+                            .content(
+                                    List.of(
+                                            new ToolResultBlock(
+                                                    "call_123",
+                                                    "query_invoice",
+                                                    List.of(
+                                                            TextBlock.builder()
+                                                                    .text("发票金额100元")
+                                                                    .build()),
+                                                    null)))
+                            .build());
+            messages.add(
+                    Msg.builder()
+                            .role(MsgRole.USER)
+                            .name("User")
+                            .content(List.of(TextBlock.builder().text("再查一张").build()))
+                            .build());
+
+            List<OpenAIMessage> result = formatter.format(messages);
+
+            // Find assistant message with tool_calls
+            OpenAIMessage assistantMsg =
+                    result.stream()
+                            .filter(m -> "assistant".equals(m.getRole()))
+                            .findFirst()
+                            .orElse(null);
+            assertNotNull(assistantMsg);
+            assertNotNull(assistantMsg.getToolCalls());
+            // Note: reasoning_content is not set from Msg in this test because ToolUseBlock
+            // doesn't carry reasoning content. The test verifies that DeepSeekFormatter
+            // correctly preserves reasoning_content when present via applyDeepSeekFixes.
+            // We directly test applyDeepSeekFixes behavior with reasoning_content.
+            List<OpenAIMessage> fixedMessages =
+                    DeepSeekFormatter.applyDeepSeekFixes(
+                            List.of(
+                                    OpenAIMessage.builder().role("user").content("查询发票").build(),
+                                    OpenAIMessage.builder()
+                                            .role("assistant")
+                                            .reasoningContent("我需要查询发票信息")
+                                            .toolCalls(
+                                                    List.of(
+                                                            OpenAIToolCall.builder()
+                                                                    .id("call_123")
+                                                                    .type("function")
+                                                                    .function(
+                                                                            OpenAIFunction.of(
+                                                                                    "query_invoice",
+                                                                                    "{}"))
+                                                                    .build()))
+                                            .build(),
+                                    OpenAIMessage.builder()
+                                            .role("tool")
+                                            .toolCallId("call_123")
+                                            .content("发票金额100元")
+                                            .build(),
+                                    OpenAIMessage.builder().role("user").content("再查一张").build()));
+            assertEquals("我需要查询发票信息", fixedMessages.get(1).getReasoningContent());
         }
 
         @Test

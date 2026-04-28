@@ -250,6 +250,48 @@ class DeepSeekFormatterTest {
         }
 
         @Test
+        @DisplayName("Should keep reasoning_content for previous turns with tool_calls")
+        void testKeepReasoningContentForPreviousTurnWithToolCalls() {
+            OpenAIToolCall toolCall =
+                    OpenAIToolCall.builder()
+                            .id("call_123")
+                            .type("function")
+                            .function(OpenAIFunction.of("query_invoice", "{}"))
+                            .build();
+
+            List<OpenAIMessage> messages =
+                    List.of(
+                            OpenAIMessage.builder().role("user").content("查询发票").build(),
+                            OpenAIMessage.builder()
+                                    .role("assistant")
+                                    .reasoningContent("我需要查询发票信息")
+                                    .toolCalls(List.of(toolCall))
+                                    .build(),
+                            OpenAIMessage.builder()
+                                    .role("tool")
+                                    .toolCallId("call_123")
+                                    .content("发票金额100元")
+                                    .build(),
+                            OpenAIMessage.builder()
+                                    .role("assistant")
+                                    .content("发票金额是100元")
+                                    .reasoningContent("根据查询结果整理答案")
+                                    .build(),
+                            OpenAIMessage.builder().role("user").content("再查一张").build());
+
+            List<OpenAIMessage> result = DeepSeekFormatter.applyDeepSeekFixes(messages);
+
+            assertEquals(5, result.size());
+            // Previous turn assistant with tool_calls should keep reasoning_content
+            assertEquals("我需要查询发票信息", result.get(1).getReasoningContent());
+            assertNotNull(result.get(1).getToolCalls());
+            assertEquals(1, result.get(1).getToolCalls().size());
+            // Previous turn assistant without tool_calls should have reasoning removed
+            assertNull(result.get(3).getReasoningContent());
+            // Current turn (last user, no assistant after it) - nothing to check
+        }
+
+        @Test
         @DisplayName("Should preserve tool calls in messages")
         void testPreserveToolCalls() {
             OpenAIToolCall toolCall =
